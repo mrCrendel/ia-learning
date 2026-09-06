@@ -4,9 +4,15 @@ import re
 
 
 def parse_plan(text: str) -> tuple[list[str], list[str]]:
-    """Возвращает (сделанные пункты, несделанные пункты)."""
-    done = re.findall(r"^\s*- \[x\] (.+)$", text, re.M | re.I)
-    todo = re.findall(r"^\s*- \[ \] (.+)$", text, re.M)
+    """Возвращает (сделанные пункты, несделанные пункты).
+
+    Считает только раздел «## Чеклист» — там недели курса; чекбоксы в теле
+    документа это критерии приёмки проектов, они в прогресс не идут.
+    """
+    _, _, checklist = text.partition("## Чеклист")
+    scope = checklist or text
+    done = re.findall(r"^\s*- \[x\] (.+)$", scope, re.M | re.I)
+    todo = re.findall(r"^\s*- \[ \] (.+)$", scope, re.M)
     return done, todo
 
 

@@ -3,7 +3,15 @@ import datetime as dt
 from remind.parse import parse_log, parse_plan
 from remind.report import build_message
 
-PLAN = "# План\n- [x] Модуль 0\n- [ ] Модуль 1\n- [ ] Модуль 2\n"
+PLAN = """# План
+- [ ] критерий проекта, в прогресс не идёт
+
+## Чеклист
+
+- [x] Модуль 0
+- [ ] Модуль 1
+- [ ] Модуль 2
+"""
 LOG = """# Дневник
 
 ## Шаблон
@@ -22,7 +30,7 @@ LOG = """# Дневник
 
 
 def test_parse():
-    assert parse_plan(PLAN) == (["Модуль 0"], ["Модуль 1", "Модуль 2"])
+    assert parse_plan(PLAN) == (["Модуль 0"], ["Модуль 1", "Модуль 2"])  # критерии вне «## Чеклист» пропущены
     assert parse_log(LOG) == [{"title": "Неделя 1 — 2026-09-06", "Сделал": "настроил репо", "Не понял": "кэш токенов", "Время": "2 ч"}]
 
 
