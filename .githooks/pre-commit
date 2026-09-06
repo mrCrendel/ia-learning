@@ -1,0 +1,4 @@
+#!/bin/sh
+# Обновляет блок прогресса в README из PLAN.md. Включить: git config core.hooksPath .githooks
+uv run python -m remind --readme || exit 0
+git add README.md

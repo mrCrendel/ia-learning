@@ -1,6 +1,7 @@
 """Ежедневный отчёт об учёбе в Telegram. Запускается launchd (см. README).
 
 `uv run python -m remind --dry-run` — показать сообщение без отправки.
+`uv run python -m remind --readme` — обновить блок прогресса в README (вызывается git-хуком).
 """
 
 import datetime as dt
@@ -11,14 +12,21 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from remind import telegram
-from remind.report import build_message
+from remind.report import build_message, update_readme
 
 ROOT = Path(__file__).parent.parent
 
 
 def main() -> None:
     load_dotenv(ROOT / ".env")
-    text = build_message((ROOT / "PLAN.md").read_text(), (ROOT / "LOG.md").read_text(), dt.date.today())
+    plan = (ROOT / "PLAN.md").read_text()
+
+    if "--readme" in sys.argv:
+        readme = ROOT / "README.md"
+        readme.write_text(update_readme(readme.read_text(), plan))
+        return
+
+    text = build_message(plan, (ROOT / "LOG.md").read_text(), dt.date.today())
     if "--dry-run" in sys.argv:
         print(text)
         return

@@ -2,6 +2,10 @@
 
 Учебный репозиторий курса AI-инженерии: 36 недель, ~5 часов в неделю, задания на Python.
 
+<!-- progress -->
+**Прогресс:** 1 из 39 (3%) · последнее: Неделя 1 · М0 · Подготовка
+<!-- progress -->
+
 ## Структура
 
 ```
@@ -12,13 +16,15 @@ PLAN.md       план курса
 LOG.md        дневник обучения
 CHEATSHEET.md конспект по модулям
 remind/       ежедневный отчёт об учёбе в Telegram
+.githooks/    pre-commit: обновляет прогресс в README
 ```
 
 ## Запуск
 
 ```bash
 uv sync
-cp .env.example .env   # вписать ключи
+cp .env.example .env             # вписать ключи
+git config core.hooksPath .githooks   # прогресс в README обновляется при коммите
 uv run week-01/hello.py
 ```
 

@@ -29,3 +29,24 @@ def build_message(plan: str, log: str, today: dt.date) -> str:
     lines.append("➡️ Дальше:")
     lines += [f"   • {item}" for item in todo[:3]] or ["   • план пуст — заполни PLAN.md"]
     return "\n".join(lines)
+
+
+MARKER = "<!-- progress -->"
+
+
+def build_progress(plan: str) -> str:
+    """Строка прогресса для README: галочки и последняя закрытая неделя."""
+    done, todo = parse_plan(plan)
+    total = len(done) + len(todo)
+    percent = round(100 * len(done) / total) if total else 0
+    last = done[-1] if done else "ещё не начато"
+    return f"**Прогресс:** {len(done)} из {total} ({percent}%) · последнее: {last}"
+
+
+def update_readme(readme: str, plan: str) -> str:
+    """Заменяет строку между маркерами MARKER. Без маркеров возвращает README как есть."""
+    head, sep, rest = readme.partition(MARKER)
+    if not sep:
+        return readme
+    _, sep2, tail = rest.partition(MARKER)
+    return f"{head}{MARKER}\n{build_progress(plan)}\n{MARKER}{tail if sep2 else rest}"
