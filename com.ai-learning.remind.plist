@@ -8,7 +8,9 @@
     <array>
         <string>/Users/ruslantolkunuulu/.local/bin/uv</string>
         <string>run</string>
-        <string>remind.py</string>
+        <string>python</string>
+        <string>-m</string>
+        <string>remind</string>
     </array>
     <key>WorkingDirectory</key>
     <string>/Users/ruslantolkunuulu/work/ai-learning</string>

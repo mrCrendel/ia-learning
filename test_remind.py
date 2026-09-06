@@ -1,6 +1,7 @@
 import datetime as dt
 
-from remind import build_message, parse_log, parse_plan
+from remind.parse import parse_log, parse_plan
+from remind.report import build_message
 
 PLAN = "# План\n- [x] Модуль 0\n- [ ] Модуль 1\n- [ ] Модуль 2\n"
 LOG = """# Дневник
