@@ -1,0 +1,18 @@
+# secrets
+.env
+
+# python
+.venv/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.pytest_cache/
+
+# node
+node_modules/
+
+# logs
+data/logs/*.jsonl
+
+# os
+.DS_Store
