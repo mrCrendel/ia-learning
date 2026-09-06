@@ -11,6 +11,7 @@ data/logs/    логи вызовов (*.jsonl, в gitignore)
 PLAN.md       план курса
 LOG.md        дневник обучения
 CHEATSHEET.md конспект по модулям
+remind.py     ежедневный отчёт об учёбе в Telegram
 ```
 
 ## Запуск
@@ -22,6 +23,21 @@ uv run week-01/hello.py
 ```
 
 Реальные ключи хранятся только в `.env` — он в `.gitignore`. В репозиторий попадает только `.env.example` без значений.
+
+## Отчёт в Telegram
+
+Бот дважды в день присылает отчёт: пройдено (чекбоксы `[x]` в PLAN.md), повторить (поле «Не понял» из последних записей LOG.md), где остановились (последняя запись LOG.md), что дальше (первые `[ ]` в PLAN.md). Посмотреть сообщение без отправки: `uv run remind.py --dry-run`.
+
+1. Создай бота через @BotFather, токен — в `.env` как `TELEGRAM_BOT_TOKEN`.
+2. Напиши боту любое сообщение, затем `uv run remind.py` — он выведет `chat_id`, добавь его в `.env`.
+3. Включи ежедневный запуск в 09:00 и 22:00 (launchd, время — в plist):
+
+```bash
+cp com.ai-learning.remind.plist ~/Library/LaunchAgents/
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.ai-learning.remind.plist
+```
+
+Выключить: `launchctl bootout gui/$(id -u)/com.ai-learning.remind`.
 
 ## Проекты
 

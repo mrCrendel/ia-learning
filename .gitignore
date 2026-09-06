@@ -13,6 +13,7 @@ node_modules/
 
 # logs
 data/logs/*.jsonl
+data/logs/*.log
 
 # os
 .DS_Store
