@@ -23,12 +23,24 @@ remind/       ежедневный отчёт об учёбе в Telegram
 
 ```bash
 uv sync
-cp .env.example .env             # вписать ключи
+cp .env.example .env             # вписать ключи провайдеров
 git config core.hooksPath .githooks   # прогресс в README обновляется при коммите
 uv run week-01/hello.py
 ```
 
 Реальные ключи хранятся только в `.env` — он в `.gitignore`. В репозиторий попадает только `.env.example` без значений.
+
+## Провайдеры
+
+`week-01/hello.py` шлёт один промпт в пять моделей. Ключи берутся из `.env`, провайдеры без ключа пропускаются.
+
+| Провайдер | Ключ | Оплата |
+|---|---|---|
+| Claude | `ANTHROPIC_API_KEY` | по токенам, [console.anthropic.com](https://console.anthropic.com) |
+| GPT | `OPENAI_API_KEY` | по токенам, [platform.openai.com](https://platform.openai.com) |
+| Kimi | `MOONSHOT_API_KEY` | по токенам, [platform.moonshot.ai](https://platform.moonshot.ai) |
+| Gemini | `GEMINI_API_KEY` | бесплатный тариф, [aistudio.google.com](https://aistudio.google.com/apikey) |
+| Groq | `GROQ_API_KEY` | бесплатный тариф, [console.groq.com](https://console.groq.com/keys) |
 
 ## Отчёт в Telegram
 
