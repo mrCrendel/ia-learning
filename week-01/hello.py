@@ -26,19 +26,19 @@ PROVIDERS = {
         "price": (1.25, 10.00),
     },
     "gemini": {
-        "model": "gemini-2.5-flash",
+        "model": "gemini-3.6-flash",
         "key": "GEMINI_API_KEY",
         "base_url": "https://generativelanguage.googleapis.com/v1beta/openai/",
         "price": (0.0, 0.0),  # бесплатный тариф
     },
     "groq": {
-        "model": "llama-3.3-70b-versatile",
+        "model": "openai/gpt-oss-120b",
         "key": "GROQ_API_KEY",
         "base_url": "https://api.groq.com/openai/v1",
         "price": (0.0, 0.0),  # бесплатный тариф
     },
     "kimi": {
-        "model": "kimi-k2-0905-preview",
+        "model": "kimi-k2.6",
         "key": "MOONSHOT_API_KEY",
         "base_url": "https://api.moonshot.ai/v1",
         "price": (0.60, 2.50),
