@@ -82,7 +82,10 @@ class LLMClient:
     def __init__(self, provider: str, tier: Tier = "mid") -> None:
         self.provider = provider
         self.tier = tier
-        raise NotImplementedError("Достань модель и цены из MODELS, ключ из окружения")
+        model, price_in, price_out = MODELS[provider][tier]
+        self.model = model
+        self.price_in = price_in
+        self.price_out = price_out
 
     async def complete(
         self,
@@ -97,7 +100,23 @@ class LLMClient:
         system идёт отдельным полем у Anthropic и первым сообщением
         с ролью "system" у OpenAI — это одно из мест, где протоколы расходятся.
         """
-        raise NotImplementedError
+
+        call = ask_claude if self.provider == "claude" else ask_openai_compatible
+        started = time.perf_counter()
+        try:
+            text, tokens_in, tokens_out = await call(cfg, self.model)
+        except Exception as e:
+            return None
+        
+        elapsed = time.perf_counter() - started
+        usage = Completion(
+            input_tokens = resp.usage.input_tokens,
+            output_tokens = resp.usage.output_tokens,
+            cost = cost(self.price_in, self.price_out, tokens_in, tokens_out),
+            seconds = elapsed
+        )
+        
+        return Completion(text, usage, self.model)
 
     async def stream(
         self,
@@ -112,5 +131,32 @@ class LLMClient:
         Полное число токенов известно только в конце потока —
         реши, как отдать Usage после того, как итерация закончилась.
         """
-        raise NotImplementedError
-        yield ""  # noqa: делает функцию генератором для проверки типов
+        # raise NotImplementedError
+        yield self.complete(prompt, system, temperature, max_tokens)
+
+    async def ask_claude(cfg: dict, model: str) -> tuple[str, int, int]:
+        from anthropic import AsyncAnthropic
+
+        async with AsyncAnthropic(api_key=os.environ[cfg["key"]]) as client:
+            resp = await client.messages.create(
+                model=model,
+                max_tokens=1024,
+                messages=[{"role": "user", "content": PROMPT}],
+            )
+        text = "".join(block.text for block in resp.content if block.type == "text")
+        return text, resp.usage.input_tokens, resp.usage.output_tokens
+
+
+    async def ask_openai_compatible(cfg: dict, model: str) -> tuple[str, int, int]:
+        """GPT, Gemini, Groq и Kimi говорят одним протоколом — меняется только base_url."""
+        from openai import AsyncOpenAI
+
+        async with AsyncOpenAI(api_key=os.environ[cfg["key"]], base_url=cfg.get("base_url")) as client:
+            resp = await client.chat.completions.create(
+                model=model,
+                messages=[{"role": "user", "content": PROMPT}],
+            )
+        return resp.choices[0].message.content or "", resp.usage.prompt_tokens, resp.usage.completion_tokens
+        
+    async def cost(price_in: float, price_out: float, tokens_in: int, tokens_out: int) -> float:
+        return (tokens_in * price_in + tokens_out * price_out) / 1_000_000
