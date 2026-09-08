@@ -9,7 +9,7 @@
 ## Структура
 
 ```
-week-NN/      задания по неделям
+weeks/mN-*/week-NN/   задания по неделям, сгруппированы по модулям плана
 projects/     проекты курса
 data/logs/    логи вызовов (*.jsonl, в gitignore)
 PLAN.md       план курса
@@ -25,20 +25,20 @@ remind/       ежедневный отчёт об учёбе в Telegram
 uv sync
 cp .env.example .env             # вписать ключи провайдеров
 git config core.hooksPath .githooks   # прогресс в README обновляется при коммите
-uv run week-01/hello.py
+uv run weeks/m0-setup/week-01/hello.py
 ```
 
 Реальные ключи хранятся только в `.env` — он в `.gitignore`. В репозиторий попадает только `.env.example` без значений.
 
 ## Провайдеры
 
-`week-01/hello.py` шлёт один промпт по весовым категориям моделей. Сравнивать цену имеет смысл только внутри категории.
+`weeks/m0-setup/week-01/hello.py` шлёт один промпт по весовым категориям моделей. Сравнивать цену имеет смысл только внутри категории.
 
 ```bash
-uv run week-01/hello.py            # mid — рабочая лошадка: RAG, чат, суммаризация
-uv run week-01/hello.py frontier   # сложное рассуждение, агенты, код
-uv run week-01/hello.py small      # классификация, извлечение, роутинг
-uv run week-01/hello.py all
+uv run weeks/m0-setup/week-01/hello.py            # mid — рабочая лошадка: RAG, чат, суммаризация
+uv run weeks/m0-setup/week-01/hello.py frontier   # сложное рассуждение, агенты, код
+uv run weeks/m0-setup/week-01/hello.py small      # классификация, извлечение, роутинг
+uv run weeks/m0-setup/week-01/hello.py all
 ```
 
 Ключи берутся из `.env`, провайдеры без ключа пропускаются.

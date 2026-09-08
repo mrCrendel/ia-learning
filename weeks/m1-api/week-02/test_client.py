@@ -1,7 +1,7 @@
 """Тесты недели 2. Пока падают — это нормально, их и надо погасить.
 
-    uv run pytest week-02/              # только быстрые, без сети и денег
-    uv run pytest week-02/ -m live      # реальные вызовы, тратит токены
+    uv run pytest weeks/m1-api/week-02/              # только быстрые, без сети и денег
+    uv run pytest weeks/m1-api/week-02/ -m live      # реальные вызовы, тратит токены
 """
 
 import pytest

@@ -17,4 +17,4 @@ dependencies = [
 asyncio_mode = "auto"
 markers = ["live: реальные вызовы к API, тратят токены"]
 addopts = "-m 'not live'"
-pythonpath = ["week-02"]
+pythonpath = ["weeks/m1-api/week-02"]
