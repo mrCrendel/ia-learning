@@ -10,6 +10,11 @@ from client import MODELS, Completion, LLMClient, Usage, cost
 
 PROMPT = "Ответь одним словом: столица Франции?"
 
+# Модели с ризонингом сначала тратят бюджет на невидимые размышления.
+# При max_tokens=100 gpt-5-nano уходит в ноль видимого текста — на ответ
+# из одного слова нужен запас в тысячи токенов, а не в сотни.
+MAX_TOKENS = 2000
+
 
 def test_cost():
     """Считается по цене за миллион токенов."""
@@ -47,7 +52,7 @@ def test_unknown_provider():
 async def test_complete(provider):
     """Оба провайдера отвечают одинаковым интерфейсом."""
     client = LLMClient(provider, tier="small")
-    result = await client.complete(PROMPT, max_tokens=100)
+    result = await client.complete(PROMPT, max_tokens=MAX_TOKENS)
 
     assert isinstance(result, Completion)
     assert "ариж" in result.text.lower()  # Париж / Paris
@@ -64,11 +69,15 @@ async def test_complete(provider):
 async def test_stream(provider):
     """Стриминг отдаёт куски текста; статистика доступна после потока."""
     client = LLMClient(provider, tier="small")
-    chunks = [chunk async for chunk in client.stream(PROMPT, max_tokens=100)]
+    chunks = [chunk async for chunk in client.stream(PROMPT, max_tokens=MAX_TOKENS)]
 
     assert len(chunks) > 1, "должно прийти несколько кусков, иначе это не стриминг"
     assert "ариж" in "".join(chunks).lower()
-    # Как получить Usage после потока — твоё решение, допиши проверку под него.
+
+    # Статистика появляется только после того, как поток закончился.
+    assert client.last_usage is not None
+    assert client.last_usage.output_tokens > 0
+    assert client.last_usage.cost > 0
 
 
 @pytest.mark.live
@@ -79,6 +88,6 @@ async def test_system_prompt():
     result = await client.complete(
         "Столица Франции?",
         system="Отвечай только заглавными буквами.",
-        max_tokens=100,
+        max_tokens=MAX_TOKENS,
     )
     assert result.text.strip() == result.text.strip().upper()

@@ -1,21 +1,20 @@
 """Неделя 2 · LLMClient — единый интерфейс к провайдерам.
 
-Каркас: сигнатуры и типы заданы, тела методов писать тебе.
-Проверка — `uv run pytest week-02/`.
+Anthropic ходит своим SDK, остальные — OpenAI-совместимым. Вся разница
+спрятана внутри класса: снаружи complete() и stream() выглядят одинаково.
 
-Что нужно сделать:
-  1. complete() — обычный вызов, вернуть Completion с текстом и статистикой.
-  2. stream() — асинхронный итератор кусков текста; итоговый Usage
-     доступен после того, как поток закончился.
-  3. Один и тот же код вызова работает и для Anthropic, и для OpenAI-совместимых.
-
-Подумай до кода: как stream() отдаст и куски текста, и статистику в конце?
-Варианта два — отдельный метод/атрибут после итерации, или последний
-элемент потока особого типа. Оба рабочие, выбери и объясни почему.
+    uv run pytest weeks/m1-api/week-02/          # быстрые, без денег
+    uv run pytest weeks/m1-api/week-02/ -m live  # реальные вызовы
 """
 
+import os
+import time
 from dataclasses import dataclass
 from typing import AsyncIterator, Literal
+
+from dotenv import load_dotenv
+
+load_dotenv()  # ключи из .env в корне репозитория
 
 Tier = Literal["frontier", "mid", "small"]
 
@@ -47,6 +46,12 @@ API_KEYS = {
     "kimi": "MOONSHOT_API_KEY",
 }
 
+# temperature пережила две зачистки:
+#   - у Anthropic её вырезали из API целиком, в SDK такого аргумента больше нет;
+#   - у OpenAI модели с ризонингом (gpt-5*) принимают только значение по умолчанию.
+# Остаётся рабочей у gemini, groq, kimi. Проверяй при смене модели.
+NO_TEMPERATURE = {"gpt-5", "gpt-5-mini", "gpt-5-nano"}
+
 
 @dataclass
 class Usage:
@@ -68,24 +73,71 @@ class Completion:
 
 
 def cost(price_in: float, price_out: float, tokens_in: int, tokens_out: int) -> float:
-    """Стоимость вызова в USD. Реализовано — образец того, как считать."""
+    """Стоимость вызова в USD."""
     return (tokens_in * price_in + tokens_out * price_out) / 1_000_000
 
 
 class LLMClient:
     """Единый интерфейс к провайдеру.
 
-    Anthropic ходит своим SDK, остальные — OpenAI-совместимым.
-    Разница должна остаться внутри класса: снаружи вызов выглядит одинаково.
+    После stream() статистика лежит в last_usage — полное число токенов
+    приходит только в конце потока, раньше его физически нет.
     """
 
     def __init__(self, provider: str, tier: Tier = "mid") -> None:
+        if provider not in MODELS:
+            raise ValueError(f"Неизвестный провайдер {provider!r}. Есть: {', '.join(MODELS)}")
+
         self.provider = provider
         self.tier = tier
-        model, price_in, price_out = MODELS[provider][tier]
-        self.model = model
-        self.price_in = price_in
-        self.price_out = price_out
+        self.model, self.price_in, self.price_out = MODELS[provider][tier]
+        self.base_url = BASE_URLS.get(provider)
+        self.last_usage: Usage | None = None
+
+    def _key(self) -> str:
+        """Ключ читается при вызове, а не в __init__ — клиент создаётся без секретов."""
+        name = API_KEYS[self.provider]
+        key = os.getenv(name)
+        if not key:
+            raise RuntimeError(f"Нет {name} в .env")
+        return key
+
+    def _usage(self, tokens_in: int, tokens_out: int, started: float) -> Usage:
+        return Usage(
+            input_tokens=tokens_in,
+            output_tokens=tokens_out,
+            cost=cost(self.price_in, self.price_out, tokens_in, tokens_out),
+            seconds=time.perf_counter() - started,
+        )
+
+    def _anthropic_args(self, prompt: str, system: str | None, max_tokens: int) -> dict:
+        """У Anthropic system — отдельное поле запроса, не сообщение.
+
+        temperature здесь нет намеренно: SDK её больше не принимает.
+        """
+        args: dict = {
+            "model": self.model,
+            "max_tokens": max_tokens,
+            "messages": [{"role": "user", "content": prompt}],
+        }
+        if system:
+            args["system"] = system
+        return args
+
+    def _openai_args(self, prompt: str, system: str | None, temperature: float, max_tokens: int) -> dict:
+        """У OpenAI system — первое сообщение в списке, отдельного поля нет."""
+        messages = [{"role": "user", "content": prompt}]
+        if system:
+            messages.insert(0, {"role": "system", "content": system})
+
+        args: dict = {
+            "model": self.model,
+            "messages": messages,
+            "max_completion_tokens": max_tokens,  # gpt-5 не принимает max_tokens
+        }
+        if self.model not in NO_TEMPERATURE:
+            args["temperature"] = temperature
+        return args
 
     async def complete(
         self,
@@ -95,28 +147,30 @@ class LLMClient:
         temperature: float = 0.0,
         max_tokens: int = 1024,
     ) -> Completion:
-        """Один вызов, полный ответ.
-
-        system идёт отдельным полем у Anthropic и первым сообщением
-        с ролью "system" у OpenAI — это одно из мест, где протоколы расходятся.
-        """
-
-        call = ask_claude if self.provider == "claude" else ask_openai_compatible
+        """Один вызов, полный ответ."""
         started = time.perf_counter()
-        try:
-            text, tokens_in, tokens_out = await call(cfg, self.model)
-        except Exception as e:
-            return None
-        
-        elapsed = time.perf_counter() - started
-        usage = Completion(
-            input_tokens = resp.usage.input_tokens,
-            output_tokens = resp.usage.output_tokens,
-            cost = cost(self.price_in, self.price_out, tokens_in, tokens_out),
-            seconds = elapsed
-        )
-        
-        return Completion(text, usage, self.model)
+
+        if self.provider == "claude":
+            from anthropic import AsyncAnthropic
+
+            async with AsyncAnthropic(api_key=self._key()) as client:
+                resp = await client.messages.create(
+                    **self._anthropic_args(prompt, system, max_tokens)
+                )
+            text = "".join(block.text for block in resp.content if block.type == "text")
+            tokens_in, tokens_out = resp.usage.input_tokens, resp.usage.output_tokens
+        else:
+            from openai import AsyncOpenAI
+
+            async with AsyncOpenAI(api_key=self._key(), base_url=self.base_url) as client:
+                resp = await client.chat.completions.create(
+                    **self._openai_args(prompt, system, temperature, max_tokens)
+                )
+            text = resp.choices[0].message.content or ""
+            tokens_in, tokens_out = resp.usage.prompt_tokens, resp.usage.completion_tokens
+
+        self.last_usage = self._usage(tokens_in, tokens_out, started)
+        return Completion(text=text, usage=self.last_usage, model=self.model)
 
     async def stream(
         self,
@@ -126,37 +180,40 @@ class LLMClient:
         temperature: float = 0.0,
         max_tokens: int = 1024,
     ) -> AsyncIterator[str]:
-        """Куски текста по мере генерации.
+        """Куски текста по мере генерации; статистика — в last_usage после потока.
 
-        Полное число токенов известно только в конце потока —
-        реши, как отдать Usage после того, как итерация закончилась.
+        Почему через атрибут, а не последним элементом потока: тогда каждый
+        элемент — просто текст, и вызывающему не надо на каждой итерации
+        проверять, не приехала ли вместо текста статистика.
         """
-        # raise NotImplementedError
-        yield self.complete(prompt, system, temperature, max_tokens)
+        started = time.perf_counter()
+        tokens_in = tokens_out = 0
+        self.last_usage = None
 
-    async def ask_claude(cfg: dict, model: str) -> tuple[str, int, int]:
-        from anthropic import AsyncAnthropic
+        if self.provider == "claude":
+            from anthropic import AsyncAnthropic
 
-        async with AsyncAnthropic(api_key=os.environ[cfg["key"]]) as client:
-            resp = await client.messages.create(
-                model=model,
-                max_tokens=1024,
-                messages=[{"role": "user", "content": PROMPT}],
-            )
-        text = "".join(block.text for block in resp.content if block.type == "text")
-        return text, resp.usage.input_tokens, resp.usage.output_tokens
+            async with AsyncAnthropic(api_key=self._key()) as client:
+                async with client.messages.stream(
+                    **self._anthropic_args(prompt, system, max_tokens)
+                ) as stream:
+                    async for chunk in stream.text_stream:
+                        yield chunk
+                    final = await stream.get_final_message()
+                    tokens_in, tokens_out = final.usage.input_tokens, final.usage.output_tokens
+        else:
+            from openai import AsyncOpenAI
 
+            async with AsyncOpenAI(api_key=self._key(), base_url=self.base_url) as client:
+                stream = await client.chat.completions.create(
+                    **self._openai_args(prompt, system, temperature, max_tokens),
+                    stream=True,
+                    stream_options={"include_usage": True},  # иначе usage в потоке не придёт
+                )
+                async for event in stream:
+                    if event.usage:  # последнее событие: текста нет, только статистика
+                        tokens_in, tokens_out = event.usage.prompt_tokens, event.usage.completion_tokens
+                    if event.choices and (piece := event.choices[0].delta.content):
+                        yield piece
 
-    async def ask_openai_compatible(cfg: dict, model: str) -> tuple[str, int, int]:
-        """GPT, Gemini, Groq и Kimi говорят одним протоколом — меняется только base_url."""
-        from openai import AsyncOpenAI
-
-        async with AsyncOpenAI(api_key=os.environ[cfg["key"]], base_url=cfg.get("base_url")) as client:
-            resp = await client.chat.completions.create(
-                model=model,
-                messages=[{"role": "user", "content": PROMPT}],
-            )
-        return resp.choices[0].message.content or "", resp.usage.prompt_tokens, resp.usage.completion_tokens
-        
-    async def cost(price_in: float, price_out: float, tokens_in: int, tokens_out: int) -> float:
-        return (tokens_in * price_in + tokens_out * price_out) / 1_000_000
+        self.last_usage = self._usage(tokens_in, tokens_out, started)
