@@ -10,4 +10,11 @@ dependencies = [
     "httpx",
     "python-dotenv",
     "pytest",
+    "pytest-asyncio",
 ]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+markers = ["live: реальные вызовы к API, тратят токены"]
+addopts = "-m 'not live'"
+pythonpath = ["week-02"]
